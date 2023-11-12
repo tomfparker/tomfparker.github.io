@@ -3,7 +3,18 @@ html {
     font-family: "Open Sans", sans-serif; /* this should be the rest of the output you got from Google Fonts */
   }
 
- 
+  .bg {
+    /* The image used */
+    background-image: "back_size";
+  
+    /* Full height */
+    height: 100%;
+  
+    /* Center and scale the image nicely */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
 
 h1 {
     text-align: center;
