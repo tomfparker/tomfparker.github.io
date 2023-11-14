@@ -1,11 +1,11 @@
 html {
     font-size: 10px; /* px means "pixels": the base font size is now 10 pixels high */
-    font-family: "Open Sans", sans-serif; /* this should be the rest of the output you got from Google Fonts */
+    font-family: "Lucida Console", sans-serif; /* this should be the rest of the output you got from Google Fonts */
   }
 
   .bg {
     /* The image used */
-    background-image: "back_size";
+    background-image: url("IMG_0067.jpg");
   
     /* Full height */
     height: 100%;
@@ -20,12 +20,16 @@ h1 {
     text-align: center;
     margin: auto;
     font-size: 30px;
+    background-color: black;
+    color: white;
    
   }
 
 h2 {
     margin: auto;
     font-size: 20px;
+    color: #7393B3;
+
    
   }
   
@@ -34,6 +38,11 @@ h2 {
     font-size: 16px;
     line-height: 2;
     letter-spacing: 1px;
+    color: #7393B3;
+
+
+    
+
   }
 
     
@@ -45,6 +54,35 @@ body {
     text-align: justify;
     text-justify: inter-word;
 
+
+
+    
+
+    }
+
+    img {
+
+      max-width: 100%;
+
+    
+    }
+
+    figure {
+      float: center;
+      justify-content:center;
+   
+   
+
+  
+    
+      text-indent: 0;
+
+      margin: 0.5em;
+      padding: 0.5em;
+    }
+    img.scaled {
+      max-width: 20%;
+    
     }
     
 @media only screen and (max-width: 600px)  {
