@@ -1,6 +1,8 @@
 html {
     font-size: 10px; /* px means "pixels": the base font size is now 10 pixels high */
     font-family: "Lucida Console", sans-serif; /* this should be the rest of the output you got from Google Fonts */
+
+    cursor: url("../IMG/mouse\(1\).svg"),auto;
   }
 
   .bg {
@@ -53,6 +55,9 @@ body {
     margin-right: 30%;
     text-align: justify;
     text-justify: inter-word;
+    cursor: ("../IMG/mouse\(1\).svg  width='32' height='32' ..."),10 10,pointer;
+
+
 
 
 
