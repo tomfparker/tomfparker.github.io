@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brian's Brain Automaton</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #817a7a;
+            font-family: 'Arial', sans-serif;
+            color: white;
+        }
+        canvas { 
+            display: block; 
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="automaton"></canvas>
+
+    <script>
+        let canvas, ctx;
+        let grid, nextGrid;
+        let cellSize = 3;
+        let rows, cols;
+        let animationSpeed = 50; // Smoother animation rate
+
+        function setupCanvas() {
+            canvas = document.getElementById("automaton");
+            ctx = canvas.getContext("2d");
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            cols = Math.floor(canvas.width / cellSize);
+            rows = Math.floor(canvas.height / cellSize);
+            grid = createInitialGrid();
+            nextGrid = createGrid();
+        }
+
+        function createGrid() {
+            return Array.from({ length: rows }, () => Array.from({ length: cols }, () => 0));
+        }
+
+        function createInitialGrid() {
+            let newGrid = createGrid();
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    newGrid[y][x] = Math.random() < 0.2 ? 1 : 0; // Sparse initial activation
+                }
+            }
+            return newGrid;
+        }
+
+        function drawGrid() {
+            ctx.fillStyle =  " #1a1818";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (grid[y][x] === 1) {
+                        ctx.fillStyle = "#533d61"; // Bright yellow for active cells
+                    } else if (grid[y][x] === 2) {
+                        ctx.fillStyle = "#008080"; // Orange for dying cells
+                    } else {
+                        continue;
+                    }
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        function updateGrid() {
+            for (let y = 1; y < rows - 1; y++) {
+                for (let x = 1; x < cols - 1; x++) {
+                    let sum = 0;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            sum += grid[y + dy][x + dx] === 1 ? 1 : 0;
+                        }
+                    }
+                    if (grid[y][x] === 0 && sum === 2) {
+                        nextGrid[y][x] = 1; // Becomes alive
+                    } else if (grid[y][x] === 1) {
+                        nextGrid[y][x] = 2; // Becomes dying
+                    } else {
+                        nextGrid[y][x] = 0; // Dead stays dead
+                    }
+                }
+            }
+            [grid, nextGrid] = [nextGrid, grid];
+        }
+
+        function animate() {
+            drawGrid();
+            updateGrid();
+            setTimeout(() => requestAnimationFrame(animate), animationSpeed);
+        }
+
+        function startAutomaton() {
+            setupCanvas();
+            animate();
+        }
+
+        window.onload = startAutomaton;
+        window.onresize = setupCanvas;
+    </script>
+</body>
+</html>
+
+
