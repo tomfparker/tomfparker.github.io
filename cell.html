@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brian's Brain Automaton</title>
+    <title>Cellular Automata</title>
     <style>
         body {
             margin: 0;
@@ -12,13 +12,69 @@
             font-family: 'Arial', sans-serif;
             color: white;
         }
-        canvas { 
-            display: block; 
+        canvas {
+            display: block;
             image-rendering: crisp-edges;
+        }
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(26, 24, 24, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #533d61;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .controls label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+        }
+        .controls select {
+            width: 200px;
+            padding: 8px 12px;
+            background: #2a2626;
+            color: #fff;
+            border: 2px solid #533d61;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .controls select:hover {
+            border-color: #008080;
+        }
+        .controls select:focus {
+            border-color: #008080;
+        }
+        .info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #bbb;
+            line-height: 1.4;
         }
     </style>
 </head>
 <body>
+    <div class="controls">
+        <label for="automatonType">Select Cellular Automaton:</label>
+        <select id="automatonType">
+            <option value="brians-brain">Brian's Brain</option>
+            <option value="game-of-life">Conway's Game of Life</option>
+            <option value="wireworld">Wireworld</option>
+            <option value="seeds">Seeds</option>
+            <option value="day-and-night">Day and Night</option>
+            <option value="highlife">HighLife</option>
+        </select>
+        <div class="info" id="automatonInfo">
+            A three-state automaton with beautiful oscillating patterns
+        </div>
+    </div>
     <canvas id="automaton"></canvas>
 
     <script>
@@ -26,7 +82,44 @@
         let grid, nextGrid;
         let cellSize = 3;
         let rows, cols;
-        let animationSpeed = 50; // Smoother animation rate
+        let animationSpeed = 50;
+        let currentAutomaton = 'brians-brain';
+
+        const automatonDescriptions = {
+            'brians-brain': 'A three-state automaton with beautiful oscillating patterns',
+            'game-of-life': 'The classic automaton: Birth (3 neighbors), Survival (2-3 neighbors)',
+            'wireworld': 'Simulates electronic circuits with electron heads and tails',
+            'seeds': 'Explosive growth pattern: cells born with exactly 2 neighbors',
+            'day-and-night': 'Symmetric automaton that works in positive and negative',
+            'highlife': 'Like Game of Life but with replicating patterns (B36/S23)'
+        };
+
+        const automatonColors = {
+            'brians-brain': {
+                background: '#1a1818',
+                states: ['#000000', '#533d61', '#008080']
+            },
+            'game-of-life': {
+                background: '#0a0a0a',
+                states: ['#000000', '#00ff00']
+            },
+            'wireworld': {
+                background: '#0f0f1e',
+                states: ['#000000', '#0066ff', '#ff0000', '#ffff00']
+            },
+            'seeds': {
+                background: '#1a1a1a',
+                states: ['#000000', '#ff6600']
+            },
+            'day-and-night': {
+                background: '#0d0d0d',
+                states: ['#000000', '#ffffff']
+            },
+            'highlife': {
+                background: '#0a0a0a',
+                states: ['#000000', '#ff00ff']
+            }
+        };
 
         function setupCanvas() {
             canvas = document.getElementById("automaton");
@@ -45,46 +138,138 @@
 
         function createInitialGrid() {
             let newGrid = createGrid();
+            let density = currentAutomaton === 'seeds' ? 0.1 : 0.2;
+            let maxState = getMaxState();
+
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
-                    newGrid[y][x] = Math.random() < 0.2 ? 1 : 0; // Sparse initial activation
+                    if (Math.random() < density) {
+                        newGrid[y][x] = Math.floor(Math.random() * maxState) + 1;
+                    }
                 }
             }
             return newGrid;
         }
 
+        function getMaxState() {
+            switch(currentAutomaton) {
+                case 'brians-brain': return 2;
+                case 'wireworld': return 3;
+                default: return 1;
+            }
+        }
+
         function drawGrid() {
-            ctx.fillStyle =  " #1a1818";
+            const colors = automatonColors[currentAutomaton];
+            ctx.fillStyle = colors.background;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
-                    if (grid[y][x] === 1) {
-                        ctx.fillStyle = "#533d61"; // Bright yellow for active cells
-                    } else if (grid[y][x] === 2) {
-                        ctx.fillStyle = "#008080"; // Orange for dying cells
-                    } else {
-                        continue;
+                    if (grid[y][x] > 0) {
+                        ctx.fillStyle = colors.states[grid[y][x]];
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                     }
-                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 }
             }
         }
 
+        function countNeighbors(y, x, state = 1) {
+            let sum = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dy === 0 && dx === 0) continue;
+                    let ny = (y + dy + rows) % rows;
+                    let nx = (x + dx + cols) % cols;
+                    if (grid[ny][nx] === state) sum++;
+                }
+            }
+            return sum;
+        }
+
+        function updateBriansBrain(y, x) {
+            if (grid[y][x] === 0 && countNeighbors(y, x, 1) === 2) {
+                return 1; // Becomes alive
+            } else if (grid[y][x] === 1) {
+                return 2; // Becomes dying
+            } else {
+                return 0; // Dead or dying becomes dead
+            }
+        }
+
+        function updateGameOfLife(y, x) {
+            let neighbors = countNeighbors(y, x, 1);
+            if (grid[y][x] === 1) {
+                return (neighbors === 2 || neighbors === 3) ? 1 : 0;
+            } else {
+                return neighbors === 3 ? 1 : 0;
+            }
+        }
+
+        function updateWireworld(y, x) {
+            // 0: empty, 1: conductor, 2: electron head, 3: electron tail
+            if (grid[y][x] === 0) return 0;
+            if (grid[y][x] === 2) return 3; // head -> tail
+            if (grid[y][x] === 3) return 1; // tail -> conductor
+            if (grid[y][x] === 1) {
+                // conductor -> head if 1 or 2 neighbors are heads
+                let heads = countNeighbors(y, x, 2);
+                return (heads === 1 || heads === 2) ? 2 : 1;
+            }
+            return 0;
+        }
+
+        function updateSeeds(y, x) {
+            let neighbors = countNeighbors(y, x, 1);
+            if (grid[y][x] === 1) {
+                return 0; // All living cells die
+            } else {
+                return neighbors === 2 ? 1 : 0; // Birth with exactly 2 neighbors
+            }
+        }
+
+        function updateDayAndNight(y, x) {
+            let neighbors = countNeighbors(y, x, 1);
+            if (grid[y][x] === 1) {
+                // Survival: 3,4,6,7,8 neighbors
+                return [3,4,6,7,8].includes(neighbors) ? 1 : 0;
+            } else {
+                // Birth: 3,6,7,8 neighbors
+                return [3,6,7,8].includes(neighbors) ? 1 : 0;
+            }
+        }
+
+        function updateHighLife(y, x) {
+            let neighbors = countNeighbors(y, x, 1);
+            if (grid[y][x] === 1) {
+                return (neighbors === 2 || neighbors === 3) ? 1 : 0;
+            } else {
+                return (neighbors === 3 || neighbors === 6) ? 1 : 0;
+            }
+        }
+
         function updateGrid() {
-            for (let y = 1; y < rows - 1; y++) {
-                for (let x = 1; x < cols - 1; x++) {
-                    let sum = 0;
-                    for (let dy = -1; dy <= 1; dy++) {
-                        for (let dx = -1; dx <= 1; dx++) {
-                            sum += grid[y + dy][x + dx] === 1 ? 1 : 0;
-                        }
-                    }
-                    if (grid[y][x] === 0 && sum === 2) {
-                        nextGrid[y][x] = 1; // Becomes alive
-                    } else if (grid[y][x] === 1) {
-                        nextGrid[y][x] = 2; // Becomes dying
-                    } else {
-                        nextGrid[y][x] = 0; // Dead stays dead
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    switch(currentAutomaton) {
+                        case 'brians-brain':
+                            nextGrid[y][x] = updateBriansBrain(y, x);
+                            break;
+                        case 'game-of-life':
+                            nextGrid[y][x] = updateGameOfLife(y, x);
+                            break;
+                        case 'wireworld':
+                            nextGrid[y][x] = updateWireworld(y, x);
+                            break;
+                        case 'seeds':
+                            nextGrid[y][x] = updateSeeds(y, x);
+                            break;
+                        case 'day-and-night':
+                            nextGrid[y][x] = updateDayAndNight(y, x);
+                            break;
+                        case 'highlife':
+                            nextGrid[y][x] = updateHighLife(y, x);
+                            break;
                     }
                 }
             }
@@ -97,15 +282,23 @@
             setTimeout(() => requestAnimationFrame(animate), animationSpeed);
         }
 
+        function restartAutomaton() {
+            setupCanvas();
+        }
+
         function startAutomaton() {
             setupCanvas();
             animate();
         }
+
+        document.getElementById('automatonType').addEventListener('change', function(e) {
+            currentAutomaton = e.target.value;
+            document.getElementById('automatonInfo').textContent = automatonDescriptions[currentAutomaton];
+            restartAutomaton();
+        });
 
         window.onload = startAutomaton;
         window.onresize = setupCanvas;
     </script>
 </body>
 </html>
-
-
