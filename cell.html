@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brian's Brain Automaton</title>
+    <title>Automata Zoo</title>
     <style>
         body {
             margin: 0;
@@ -12,13 +12,43 @@
             font-family: 'Arial', sans-serif;
             color: white;
         }
-        canvas { 
-            display: block; 
+        canvas {
+            display: block;
             image-rendering: crisp-edges;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+        select {
+            background: #1a1818;
+            color: white;
+            border: 2px solid #533d61;
+            padding: 10px 15px;
+            font-size: 16px;
+            font-family: 'Arial', sans-serif;
+            border-radius: 5px;
+            cursor: pointer;
+            outline: none;
+        }
+        select:hover {
+            border-color: #008080;
+        }
+        select option {
+            background: #1a1818;
+            color: white;
         }
     </style>
 </head>
 <body>
+    <div class="controls">
+        <select id="automatonSelect">
+            <option value="briansBrain">Brian's Brain</option>
+            <option value="gameOfLife">Conway's Game of Life</option>
+        </select>
+    </div>
     <canvas id="automaton"></canvas>
 
     <script>
@@ -26,7 +56,9 @@
         let grid, nextGrid;
         let cellSize = 3;
         let rows, cols;
-        let animationSpeed = 50; // Smoother animation rate
+        let animationSpeed = 50;
+        let currentAutomaton = 'briansBrain';
+        let animationId;
 
         function setupCanvas() {
             canvas = document.getElementById("automaton");
@@ -45,46 +77,108 @@
 
         function createInitialGrid() {
             let newGrid = createGrid();
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    newGrid[y][x] = Math.random() < 0.2 ? 1 : 0; // Sparse initial activation
-                }
+
+            switch(currentAutomaton) {
+                case 'briansBrain':
+                    // Sparse random initialization
+                    for (let y = 0; y < rows; y++) {
+                        for (let x = 0; x < cols; x++) {
+                            newGrid[y][x] = Math.random() < 0.2 ? 1 : 0;
+                        }
+                    }
+                    break;
+
+                case 'gameOfLife':
+                    // Create clusters and some patterns
+                    for (let i = 0; i < Math.floor(rows * cols / 100); i++) {
+                        let cx = Math.floor(Math.random() * cols);
+                        let cy = Math.floor(Math.random() * rows);
+                        // Create small clusters
+                        for (let dy = -2; dy <= 2; dy++) {
+                            for (let dx = -2; dx <= 2; dx++) {
+                                let y = cy + dy;
+                                let x = cx + dx;
+                                if (y >= 0 && y < rows && x >= 0 && x < cols) {
+                                    if (Math.random() < 0.5) {
+                                        newGrid[y][x] = 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
             }
             return newGrid;
         }
 
         function drawGrid() {
-            ctx.fillStyle =  " #1a1818";
+            ctx.fillStyle = "#1a1818";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
             for (let y = 0; y < rows; y++) {
                 for (let x = 0; x < cols; x++) {
-                    if (grid[y][x] === 1) {
-                        ctx.fillStyle = "#533d61"; // Bright yellow for active cells
-                    } else if (grid[y][x] === 2) {
-                        ctx.fillStyle = "#008080"; // Orange for dying cells
-                    } else {
-                        continue;
+                    let state = grid[y][x];
+                    if (state === 0) continue;
+
+                    // Color schemes for different automata
+                    switch(currentAutomaton) {
+                        case 'briansBrain':
+                            ctx.fillStyle = state === 1 ? "#533d61" : "#008080";
+                            break;
+                        case 'gameOfLife':
+                            ctx.fillStyle = "#00ff00";
+                            break;
                     }
                     ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 }
             }
         }
 
-        function updateGrid() {
-            for (let y = 1; y < rows - 1; y++) {
-                for (let x = 1; x < cols - 1; x++) {
-                    let sum = 0;
-                    for (let dy = -1; dy <= 1; dy++) {
-                        for (let dx = -1; dx <= 1; dx++) {
-                            sum += grid[y + dy][x + dx] === 1 ? 1 : 0;
-                        }
+        function countNeighbors(y, x, state = 1) {
+            let sum = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    let ny = y + dy;
+                    let nx = x + dx;
+                    if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
+                        sum += grid[ny][nx] === state ? 1 : 0;
                     }
-                    if (grid[y][x] === 0 && sum === 2) {
-                        nextGrid[y][x] = 1; // Becomes alive
-                    } else if (grid[y][x] === 1) {
-                        nextGrid[y][x] = 2; // Becomes dying
-                    } else {
-                        nextGrid[y][x] = 0; // Dead stays dead
+                }
+            }
+            return sum;
+        }
+
+        function updateBriansBrain(y, x) {
+            let neighbors = countNeighbors(y, x, 1);
+            if (grid[y][x] === 0 && neighbors === 2) {
+                return 1; // Becomes alive
+            } else if (grid[y][x] === 1) {
+                return 2; // Becomes dying
+            } else {
+                return 0; // Dead
+            }
+        }
+
+        function updateGameOfLife(y, x) {
+            let neighbors = countNeighbors(y, x, 1);
+            if (grid[y][x] === 1) {
+                return (neighbors === 2 || neighbors === 3) ? 1 : 0;
+            } else {
+                return neighbors === 3 ? 1 : 0;
+            }
+        }
+
+        function updateGrid() {
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    switch(currentAutomaton) {
+                        case 'briansBrain':
+                            nextGrid[y][x] = updateBriansBrain(y, x);
+                            break;
+                        case 'gameOfLife':
+                            nextGrid[y][x] = updateGameOfLife(y, x);
+                            break;
                     }
                 }
             }
@@ -94,7 +188,7 @@
         function animate() {
             drawGrid();
             updateGrid();
-            setTimeout(() => requestAnimationFrame(animate), animationSpeed);
+            animationId = setTimeout(() => requestAnimationFrame(animate), animationSpeed);
         }
 
         function startAutomaton() {
@@ -102,8 +196,27 @@
             animate();
         }
 
+        function changeAutomaton(newType) {
+            currentAutomaton = newType;
+            if (animationId) {
+                clearTimeout(animationId);
+            }
+            setupCanvas();
+            animate();
+        }
+
+        document.getElementById('automatonSelect').addEventListener('change', function(e) {
+            changeAutomaton(e.target.value);
+        });
+
         window.onload = startAutomaton;
-        window.onresize = setupCanvas;
+        window.onresize = () => {
+            if (animationId) {
+                clearTimeout(animationId);
+            }
+            setupCanvas();
+            animate();
+        };
     </script>
 </body>
 </html>
