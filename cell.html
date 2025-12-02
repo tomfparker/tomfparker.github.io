@@ -46,7 +46,8 @@
     <div class="controls">
         <select id="automatonSelect">
             <option value="briansBrain">Brian's Brain</option>
-            <option value="gameOfLife">Conway's Game of Life</option>
+            <option value="rule90">Rule 90</option>
+            <option value="langtonsAnt">Langton's Ant</option>
         </select>
     </div>
     <canvas id="automaton"></canvas>
@@ -59,6 +60,8 @@
         let animationSpeed = 50;
         let currentAutomaton = 'briansBrain';
         let animationId;
+        let rule90Row = 0; // Track current row for Rule 90
+        let ant = { x: 0, y: 0, dir: 0 }; // Langton's Ant: position and direction (0=N, 1=E, 2=S, 3=W)
 
         function setupCanvas() {
             canvas = document.getElementById("automaton");
@@ -69,6 +72,8 @@
             rows = Math.floor(canvas.height / cellSize);
             grid = createInitialGrid();
             nextGrid = createGrid();
+            rule90Row = 0;
+            ant = { x: Math.floor(cols / 2), y: Math.floor(rows / 2), dir: 0 };
         }
 
         function createGrid() {
@@ -88,24 +93,15 @@
                     }
                     break;
 
-                case 'gameOfLife':
-                    // Create clusters and some patterns
-                    for (let i = 0; i < Math.floor(rows * cols / 100); i++) {
-                        let cx = Math.floor(Math.random() * cols);
-                        let cy = Math.floor(Math.random() * rows);
-                        // Create small clusters
-                        for (let dy = -2; dy <= 2; dy++) {
-                            for (let dx = -2; dx <= 2; dx++) {
-                                let y = cy + dy;
-                                let x = cx + dx;
-                                if (y >= 0 && y < rows && x >= 0 && x < cols) {
-                                    if (Math.random() < 0.5) {
-                                        newGrid[y][x] = 1;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                case 'rule90':
+                    // Rule 90: Start with a single cell in the middle of the first row
+                    const middleX = Math.floor(cols / 2);
+                    newGrid[0][middleX] = 1;
+                    break;
+
+                case 'langtonsAnt':
+                    // Langton's Ant: Start with empty grid, ant will create pattern
+                    // Grid is already initialized to all 0s
                     break;
             }
             return newGrid;
@@ -125,12 +121,21 @@
                         case 'briansBrain':
                             ctx.fillStyle = state === 1 ? "#533d61" : "#008080";
                             break;
-                        case 'gameOfLife':
-                            ctx.fillStyle = "#00ff00";
+                        case 'rule90':
+                            ctx.fillStyle = "#ffffff";
+                            break;
+                        case 'langtonsAnt':
+                            ctx.fillStyle = "#ffffff";
                             break;
                     }
                     ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 }
+            }
+
+            // Draw the ant itself
+            if (currentAutomaton === 'langtonsAnt') {
+                ctx.fillStyle = "#ff0000";
+                ctx.fillRect(ant.x * cellSize, ant.y * cellSize, cellSize, cellSize);
             }
         }
 
@@ -160,29 +165,80 @@
             }
         }
 
-        function updateGameOfLife(y, x) {
-            let neighbors = countNeighbors(y, x, 1);
-            if (grid[y][x] === 1) {
-                return (neighbors === 2 || neighbors === 3) ? 1 : 0;
+        function updateRule90() {
+            // Rule 90: new cell state = XOR of left and right neighbors
+            // For 1D cellular automaton displayed row by row
+            if (rule90Row >= rows - 1) {
+                // Scroll: shift all rows up by one
+                for (let y = 0; y < rows - 1; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        grid[y][x] = grid[y + 1][x];
+                    }
+                }
+                // Clear the bottom row (it will be filled with the new generation)
+                for (let x = 0; x < cols; x++) {
+                    grid[rows - 1][x] = 0;
+                }
+                // Continue generating at the bottom row
+                rule90Row = rows - 2;
+            }
+
+            const currentRow = rule90Row;
+            const nextRow = rule90Row + 1;
+
+            for (let x = 0; x < cols; x++) {
+                const left = x > 0 ? grid[currentRow][x - 1] : 0;
+                const right = x < cols - 1 ? grid[currentRow][x + 1] : 0;
+                // Rule 90: XOR of left and right neighbors
+                grid[nextRow][x] = (left ^ right);
+            }
+
+            rule90Row++;
+        }
+
+        function updateLangtonsAnt() {
+            // Langton's Ant rules:
+            // - At a white square, turn 90° right, flip the color, move forward
+            // - At a black square, turn 90° left, flip the color, move forward
+
+            const currentCell = grid[ant.y][ant.x];
+
+            if (currentCell === 0) {
+                // White square: turn right
+                ant.dir = (ant.dir + 1) % 4;
+                grid[ant.y][ant.x] = 1; // Flip to black
             } else {
-                return neighbors === 3 ? 1 : 0;
+                // Black square: turn left
+                ant.dir = (ant.dir + 3) % 4; // +3 mod 4 is same as -1 mod 4
+                grid[ant.y][ant.x] = 0; // Flip to white
+            }
+
+            // Move forward based on direction: 0=N, 1=E, 2=S, 3=W
+            switch(ant.dir) {
+                case 0: ant.y = (ant.y - 1 + rows) % rows; break; // North
+                case 1: ant.x = (ant.x + 1) % cols; break;         // East
+                case 2: ant.y = (ant.y + 1) % rows; break;         // South
+                case 3: ant.x = (ant.x - 1 + cols) % cols; break;  // West
             }
         }
 
         function updateGrid() {
-            for (let y = 0; y < rows; y++) {
-                for (let x = 0; x < cols; x++) {
-                    switch(currentAutomaton) {
-                        case 'briansBrain':
-                            nextGrid[y][x] = updateBriansBrain(y, x);
-                            break;
-                        case 'gameOfLife':
-                            nextGrid[y][x] = updateGameOfLife(y, x);
-                            break;
+            if (currentAutomaton === 'rule90') {
+                updateRule90();
+            } else if (currentAutomaton === 'langtonsAnt') {
+                updateLangtonsAnt();
+            } else {
+                for (let y = 0; y < rows; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        switch(currentAutomaton) {
+                            case 'briansBrain':
+                                nextGrid[y][x] = updateBriansBrain(y, x);
+                                break;
+                        }
                     }
                 }
+                [grid, nextGrid] = [nextGrid, grid];
             }
-            [grid, nextGrid] = [nextGrid, grid];
         }
 
         function animate() {
