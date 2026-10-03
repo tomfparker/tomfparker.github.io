@@ -47,7 +47,7 @@
         <select id="automatonSelect">
             <option value="briansBrain">Brian's Brain</option>
             <option value="rule90">Rule 90</option>
-            <option value="langtonsAnt">Langton's Ant</option>
+            <option value="faders">Faders</option>
         </select>
     </div>
     <canvas id="automaton"></canvas>
@@ -61,7 +61,14 @@
         let currentAutomaton = 'briansBrain';
         let animationId;
         let rule90Row = 0; // Track current row for Rule 90
-        let ant = { x: 0, y: 0, dir: 0 }; // Langton's Ant: position and direction (0=N, 1=E, 2=S, 3=W)
+        const FADERS_STATES = 25; // Faders (Rudy Rucker): Generations rule 2/2/25
+        // Faders colours: firing cells bright, then fading from teal into the background
+        const fadersColors = Array.from({ length: FADERS_STATES }, (_, s) => {
+            if (s <= 1) return "#c9a8e0";
+            const t = (s - 2) / (FADERS_STATES - 3);
+            const mix = (a, b) => Math.round(a + (b - a) * t);
+            return `rgb(${mix(0, 26)}, ${mix(160, 24)}, ${mix(160, 24)})`;
+        });
 
         function setupCanvas() {
             canvas = document.getElementById("automaton");
@@ -73,7 +80,6 @@
             grid = createInitialGrid();
             nextGrid = createGrid();
             rule90Row = 0;
-            ant = { x: Math.floor(cols / 2), y: Math.floor(rows / 2), dir: 0 };
         }
 
         function createGrid() {
@@ -85,10 +91,11 @@
 
             switch(currentAutomaton) {
                 case 'briansBrain':
-                    // Sparse random initialization
+                    // Sparse random initialization: 20% firing, 10% dying
                     for (let y = 0; y < rows; y++) {
                         for (let x = 0; x < cols; x++) {
-                            newGrid[y][x] = Math.random() < 0.2 ? 1 : 0;
+                            const r = Math.random();
+                            newGrid[y][x] = r < 0.2 ? 1 : r < 0.3 ? 2 : 0;
                         }
                     }
                     break;
@@ -99,9 +106,13 @@
                     newGrid[0][middleX] = 1;
                     break;
 
-                case 'langtonsAnt':
-                    // Langton's Ant: Start with empty grid, ant will create pattern
-                    // Grid is already initialized to all 0s
+                case 'faders':
+                    // Sparse random initialization of firing cells
+                    for (let y = 0; y < rows; y++) {
+                        for (let x = 0; x < cols; x++) {
+                            newGrid[y][x] = Math.random() < 0.2 ? 1 : 0;
+                        }
+                    }
                     break;
             }
             return newGrid;
@@ -124,18 +135,12 @@
                         case 'rule90':
                             ctx.fillStyle = "#ffffff";
                             break;
-                        case 'langtonsAnt':
-                            ctx.fillStyle = "#ffffff";
+                        case 'faders':
+                            ctx.fillStyle = fadersColors[state];
                             break;
                     }
                     ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 }
-            }
-
-            // Draw the ant itself
-            if (currentAutomaton === 'langtonsAnt') {
-                ctx.fillStyle = "#ff0000";
-                ctx.fillRect(ant.x * cellSize, ant.y * cellSize, cellSize, cellSize);
             }
         }
 
@@ -144,11 +149,10 @@
             for (let dy = -1; dy <= 1; dy++) {
                 for (let dx = -1; dx <= 1; dx++) {
                     if (dx === 0 && dy === 0) continue;
-                    let ny = y + dy;
-                    let nx = x + dx;
-                    if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
-                        sum += grid[ny][nx] === state ? 1 : 0;
-                    }
+                    // Wrap around the edges (toroidal grid)
+                    let ny = (y + dy + rows) % rows;
+                    let nx = (x + dx + cols) % cols;
+                    sum += grid[ny][nx] === state ? 1 : 0;
                 }
             }
             return sum;
@@ -162,6 +166,22 @@
                 return 2; // Becomes dying
             } else {
                 return 0; // Dead
+            }
+        }
+
+        function updateFaders(y, x) {
+            // Faders: only firing cells (state 1) count as neighbours
+            // - Off cell with exactly 2 firing neighbours turns on
+            // - Firing cell with exactly 2 firing neighbours stays on, otherwise starts fading
+            // - Fading cells step through the remaining states back to off
+            let state = grid[y][x];
+            let neighbors = countNeighbors(y, x, 1);
+            if (state === 0) {
+                return neighbors === 2 ? 1 : 0;
+            } else if (state === 1) {
+                return neighbors === 2 ? 1 : 2;
+            } else {
+                return (state + 1) % FADERS_STATES;
             }
         }
 
@@ -196,43 +216,18 @@
             rule90Row++;
         }
 
-        function updateLangtonsAnt() {
-            // Langton's Ant rules:
-            // - At a white square, turn 90° right, flip the color, move forward
-            // - At a black square, turn 90° left, flip the color, move forward
-
-            const currentCell = grid[ant.y][ant.x];
-
-            if (currentCell === 0) {
-                // White square: turn right
-                ant.dir = (ant.dir + 1) % 4;
-                grid[ant.y][ant.x] = 1; // Flip to black
-            } else {
-                // Black square: turn left
-                ant.dir = (ant.dir + 3) % 4; // +3 mod 4 is same as -1 mod 4
-                grid[ant.y][ant.x] = 0; // Flip to white
-            }
-
-            // Move forward based on direction: 0=N, 1=E, 2=S, 3=W
-            switch(ant.dir) {
-                case 0: ant.y = (ant.y - 1 + rows) % rows; break; // North
-                case 1: ant.x = (ant.x + 1) % cols; break;         // East
-                case 2: ant.y = (ant.y + 1) % rows; break;         // South
-                case 3: ant.x = (ant.x - 1 + cols) % cols; break;  // West
-            }
-        }
-
         function updateGrid() {
             if (currentAutomaton === 'rule90') {
                 updateRule90();
-            } else if (currentAutomaton === 'langtonsAnt') {
-                updateLangtonsAnt();
             } else {
                 for (let y = 0; y < rows; y++) {
                     for (let x = 0; x < cols; x++) {
                         switch(currentAutomaton) {
                             case 'briansBrain':
                                 nextGrid[y][x] = updateBriansBrain(y, x);
+                                break;
+                            case 'faders':
+                                nextGrid[y][x] = updateFaders(y, x);
                                 break;
                         }
                     }
